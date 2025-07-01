@@ -4,3 +4,12 @@
 
 !starburst-2.0.0.metabase-driver.jar
 
+# Ignore local data, logs, and database files
+minio-data/
+mariadb-data/
+metabase/data/
+
+# Ignore IDE and OS files
+.vscode/
+.idea/
+*.DS_Store

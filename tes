@@ -1,0 +1,122 @@
+CREATE TABLE IF NOT EXISTS hive.default.movies_raw_csv (
+   movieId VARCHAR,
+   title VARCHAR,
+   genres VARCHAR
+)
+WITH (
+    format = 'CSV',
+    skip_header_line_count = 1,
+    external_location = 's3a://movie/movies/'
+);
+
+CREATE TABLE IF NOT EXISTS iceberg.structuredmovie.movies (
+  movieId INT,
+  title VARCHAR,
+  genres ARRAY(VARCHAR)
+)
+WITH (
+  FORMAT = 'PARQUET'
+);
+
+INSERT INTO iceberg.structuredmovie.movies
+SELECT
+    CAST(movieId AS INT),
+    title,
+    split(genres, '|')
+FROM
+    hive.default.movies_raw_csv;
+
+
+CREATE TABLE IF NOT EXISTS hive.default.links_raw_csv (
+   movieId VARCHAR,
+   imdbId VARCHAR,
+   tmdbId VARCHAR
+)
+WITH (
+    format = 'CSV',
+    skip_header_line_count = 1,
+    external_location = 's3a://movie/links/'
+);
+
+CREATE TABLE IF NOT EXISTS iceberg.structuredmovie.links (
+  movieId INT,
+  imdbId VARCHAR,
+  tmdbId INT
+)
+WITH (
+  FORMAT = 'PARQUET'
+);
+
+INSERT INTO iceberg.structuredmovie.links
+SELECT
+    TRY_CAST(movieId AS INT),
+    imdbId,
+    TRY_CAST(tmdbId AS INT)
+FROM
+    hive.default.links_raw_csv;
+
+
+CREATE TABLE IF NOT EXISTS hive.default.tags_raw_csv (
+   userId VARCHAR,
+   movieId VARCHAR,
+   tag VARCHAR,
+   timestamp VARCHAR
+)
+WITH (
+    format = 'CSV',
+    skip_header_line_count = 2,
+    external_location = 's3a://movie/tags/'
+);
+
+CREATE TABLE IF NOT EXISTS iceberg.structuredmovie.tags (
+  userId INT,
+  movieId INT,
+  tag VARCHAR,
+  event_timestamp TIMESTAMP(6)
+)
+WITH (
+  FORMAT = 'PARQUET'
+);
+
+INSERT INTO iceberg.structuredmovie.tags
+SELECT
+    TRY_CAST(userId AS INT),
+    TRY_CAST(movieId AS INT),
+    tag,
+    from_unixtime(TRY_CAST(timestamp AS BIGINT))
+FROM
+    hive.default.tags_raw_csv;
+
+
+CREATE TABLE hive.default.reviews_staging (
+   review_id VARCHAR,
+   rating VARCHAR,
+   sentiment VARCHAR,
+   dataset VARCHAR,
+   review_text VARCHAR
+)
+WITH (
+    format = 'CSV',
+    skip_header_line_count = 1,
+    external_location = 's3a://movieunstructured/reviews/'
+);
+
+INSERT INTO iceberg.unstructured_reviews.reviews
+SELECT
+    review_id,
+    CAST(rating AS INT),
+    sentiment,
+    dataset,
+    review_text
+FROM
+    hive.default.reviews_staging;
+
+INSERT INTO iceberg.unstructured_reviews.reviews
+SELECT
+    review_id,
+    CAST(rating AS INT),
+    sentiment,
+    dataset,
+    review_text
+FROM
+    hive.default.reviews_staging;
